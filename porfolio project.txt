@@ -1,0 +1,213 @@
+/*
+Covid 19 Data Exploration 
+Skills used: Joins, CTE's, Temp Tables, Windows Functions, Aggregate Functions, Creating Views, Converting Data Types
+*/
+
+
+SELECT * FROM dbo.coviddeaths
+order by location,date
+
+SELECT * FROM dbo.covidvaccinations
+order by 3,4
+
+-- Select Data that we are going to be starting with
+
+SELECT location,date, new_cases,total_cases,total_deaths,population
+FROM dbo.coviddeaths
+Where continent is not null 
+order by 1,2
+
+
+-- Total Cases vs Total Deaths in pakistan showing data decendingly to location and date 
+-- Shows likelihood of dying if you contract covid in your country
+
+SELECT location,date,total_cases,total_deaths,population,(total_deaths/ total_cases)* 100 as death_percentage
+FROM dbo.coviddeaths
+where location like '%Pak%'and continent is not null 
+order by 1,2 desc
+ 
+--looking at total case vs population 
+--shows what percentage of populaion got covid 
+
+SELECT location,date,total_cases,population,(total_deaths/population)*100 as population_affected 
+FROM dbo.coviddeaths
+where continent is not null
+order by 1,2 desc 
+
+-- the country that have the highest infected rate compared to population
+SELECT location,max(total_cases) as highestinfected, population,max((total_cases/population)* 100 )as population_infected
+FROM dbo.coviddeaths
+where continent is not null
+group by population,location
+order by population_infected desc
+
+-- for checking the pakistan infected rate specifically 
+where location like '%pak%'
+
+
+-- showing countries that shows highest death count 
+SELECT location, max(cast (total_deaths as int))as deaths
+FROM dbo.coviddeaths
+where continent is not null
+group by location 
+order by deaths desc
+
+
+-- BREAKING THINGS DOWN BY CONTINENT
+
+-- Showing contintents with the highest death count per population
+
+SELECT continent, max(cast (total_deaths as int))as deaths
+FROM dbo.coviddeaths
+where continent is not null
+group by continent 
+order by deaths desc 
+
+-- GLOBAL NUMBERS    
+SELECT date,sum(new_cases) as totalcases,sum(cast(new_deaths as  int))as totaldeaths ,sum(cast(new_deaths as  int))/ sum(new_cases)*100 as death_percentage
+FROM dbo.coviddeaths
+where continent is not null
+group by date 
+order by date desc 
+
+
+--total deaths per new cases and new deaths 
+SELECT sum(new_cases) as totalcases,sum(cast(new_deaths as  int))as totaldeaths ,sum(cast(new_deaths as  int))/ sum(new_cases)*100 as death_percentage
+FROM dbo.coviddeaths
+where continent is not null
+
+-- Total Population vs Vaccinations
+-- Shows Percentage of Population that has recieved at least one Covid Vaccine
+
+select deaths.continent,deaths.location,deaths.date,vaccination.new_vaccinations,
+sum(convert(bigint,vaccination.new_vaccinations)) over (partition by deaths.location order by deaths.location,vaccination.date) as rolling_people_vaccinated 
+from dbo.covidvaccinations as vaccination inner join dbo.coviddeaths as deaths 
+on vaccination.location = deaths.location
+and vaccination.date= deaths.date 
+where deaths.continent is not null 
+order by 2,3
+ -- Use of CTE to perform Calculation on Partition By in previous query
+
+With popvsvaccination(continent, Location, Date, Population, New_Vaccinations, rolling_people_vaccinated)
+as
+(select deaths.continent,deaths.location,deaths.date,deaths.population,vaccination.new_vaccinations,
+sum(convert(bigint,vaccination.new_vaccinations)) over (partition by deaths.location order by deaths.location,vaccination.date) as rolling_people_vaccinated 
+from dbo.covidvaccinations as vaccination inner join dbo.coviddeaths as deaths 
+on vaccination.location = deaths.location
+and vaccination.date= deaths.date 
+where deaths.continent is not null
+)
+select *,(rolling_people_vaccinated/Population)*100 as vacinated_percentage_population 
+from popvsvaccination 
+
+
+--create temporary table with the previous query 
+DROP Table if exists #PercentPopulationVaccinated
+
+Create Table #PercentPopulationVaccinated
+(
+Continent nvarchar(255),
+Location nvarchar(255),
+Date datetime,
+Population numeric,
+New_vaccinations numeric,
+rolling_people_vaccinated numeric)
+Insert into #PercentPopulationVaccinated
+select deaths.continent,deaths.location,deaths.date,deaths.population,vaccination.new_vaccinations,
+sum(convert(bigint,vaccination.new_vaccinations)) over (partition by deaths.location order by deaths.location,vaccination.date) as rolling_people_vaccinated 
+from dbo.covidvaccinations as vaccination inner join dbo.coviddeaths as deaths 
+on vaccination.location = deaths.location
+and vaccination.date= deaths.date 
+where deaths.continent is not null
+Select *, (rolling_people_vaccinated/Population)*100
+From #PercentPopulationVaccinated
+
+--Creating views for late visualization 
+create view PercentPopulationVaccinated as
+(
+select deaths.continent,deaths.location,deaths.date,vaccination.new_vaccinations,
+sum(convert(bigint,vaccination.new_vaccinations)) over (partition by deaths.location order by deaths.location,vaccination.date) as rolling_people_vaccinated 
+from dbo.covidvaccinations as vaccination inner join dbo.coviddeaths as deaths 
+on vaccination.location = deaths.location
+and vaccination.date= deaths.date 
+where deaths.continent is not null )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
